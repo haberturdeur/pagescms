@@ -1,5 +1,7 @@
 "use client";
 
+import { useRepoPermissions } from "@/hooks/use-repo-permissions";
+
 import { useMemo, useState } from "react";
 import { useConfig } from "@/contexts/config-context";
 import { getParentPath, getRelativePath, joinPathSegments, normalizePath } from "@/lib/utils/file";
@@ -52,6 +54,7 @@ export function FileOptions({
 }) {
   const { config } = useConfig();
   if (!config) throw new Error(`Configuration not found.`);
+  const permissions = useRepoPermissions(config);
 
   const normalizedPath = useMemo(() => normalizePath(path), [path]);
   const rootPath = useMemo(() => {
@@ -66,8 +69,8 @@ export function FileOptions({
     return getParentPath(path);
   }, [type, name, config.object, path]);
   const relativePath = useMemo(() => getRelativePath(normalizedPath, rootPath), [normalizedPath, rootPath]);
-  const showRename = type !== "settings" && type !== "file" && canRename !== false;
-  const showDelete = type !== "settings" && canDelete !== false;
+  const showRename = type !== "settings" && type !== "file" && canRename !== false && permissions.can(normalizedPath, "delete");
+  const showDelete = type !== "settings" && canDelete !== false && permissions.can(normalizedPath, "delete");
 
   const [newPath, setNewPath] = useState(relativePath);
   const [isRenameOpen, setIsRenameOpen] = useState(false);

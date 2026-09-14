@@ -1,5 +1,7 @@
 "use client";
 
+import { useRepoPermissions } from "@/hooks/use-repo-permissions";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { formatDistanceToNowStrict } from "date-fns";
@@ -138,6 +140,7 @@ export function RepoActionButtons({
   contextData = {},
   layout = "header",
 }: RepoActionButtonsProps) {
+  const permissions = useRepoPermissions({ owner, repo, branch: refName });
   const { user } = useUser();
   const { trackActionRun } = useActionToasts();
   const isGithubUser = hasGithubIdentity(user);
@@ -440,7 +443,7 @@ export function RepoActionButtons({
     </Dialog>
   );
 
-  if (actions.length === 0) return null;
+  if (actions.length === 0 || !permissions.repositoryActions) return null;
 
   if (layout === "sidebar") {
     return (

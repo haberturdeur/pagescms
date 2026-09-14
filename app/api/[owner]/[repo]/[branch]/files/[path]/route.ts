@@ -1,3 +1,5 @@
+import { getRepoAccess } from "@/lib/repo-access";
+import { canonicalRepoPath } from "@/lib/repo-permissions";
 import { type NextRequest } from "next/server";
 import { createOctokitInstance } from "@/lib/utils/octokit";
 import { isContentOperationAllowed } from "@/lib/operations";
@@ -6,7 +8,7 @@ import { configVersion, parseConfig, normalizeConfig } from "@/lib/config";
 import { stringify, parse } from "@/lib/serialization";
 import { deepMap, generateZodSchema, getSchemaByName, sanitizeObject } from "@/lib/schema";
 import { getConfig, updateConfig } from "@/lib/config-store";
-import { getFileExtension, getFileName, normalizePath, serializedTypes, getParentPath } from "@/lib/utils/file";
+import { getFileExtension, getFileName, serializedTypes, getParentPath } from "@/lib/utils/file";
 import { assertGithubIdentity } from "@/lib/authz-shared";
 import { getToken } from "@/lib/token";
 import { updateFileCache } from "@/lib/github-cache-file";
@@ -34,10 +36,11 @@ export async function POST(
     if ("response" in sessionResult) return sessionResult.response;
     const user = sessionResult.user;
 
-    const { token } = await getToken(user, params.owner, params.repo, true);
+    const { token, source } = await getToken(user, params.owner, params.repo, true);
+    const access = await getRepoAccess(user, params.owner, params.repo, token, source);
     if (!token) throw new Error("Token not found");
 
-    const normalizedPath = normalizePath(params.path);
+    const normalizedPath = canonicalRepoPath(params.path);
 
     const config = await getConfig(params.owner, params.repo, params.branch, {
       getToken: async () => token,
@@ -45,6 +48,7 @@ export async function POST(
     if (!config && normalizedPath !== ".pages.yml") throw new Error(`Configuration not found for ${params.owner}/${params.repo}/${params.branch}.`);
 
     const data: any = await request.json();
+    access.assert(normalizedPath, data.sha ? "update" : "create");
     const onConflict = data.onConflict === "error" ? "error" : "rename";
 
     let contentBase64;
@@ -64,7 +68,7 @@ export async function POST(
         schemaCommitTemplates = schema?.commit?.templates;
         schemaCommitIdentity = schema?.commit?.identity;
 
-        if (!normalizedPath.startsWith(schema.path)) throw new Error(`Invalid path "${params.path}" for ${data.type} "${data.name}".`);
+        if (!(schema.type === "file" ? normalizedPath === schema.path : (!schema.path || normalizedPath.startsWith(schema.path.replace(/\/$/, "") + "/")))) throw new Error(`Invalid path "${params.path}" for ${data.type} "${data.name}".`);
 
         if (schema.subfolders === false && getParentPath(normalizedPath) !== schema.path) {
           throw new Error(`Subfolders are not allowed for collection "${data.name}".`);
@@ -168,7 +172,7 @@ export async function POST(
         schemaCommitTemplates = schema?.commit?.templates;
         schemaCommitIdentity = schema?.commit?.identity;
 
-        if (!normalizedPath.startsWith(schema.input)) throw new Error(`Invalid path "${params.path}" for media "${data.name}".`);
+        if (!(!schema.input || normalizedPath.startsWith(schema.input.replace(/\/$/, "") + "/"))) throw new Error(`Invalid path "${params.path}" for media "${data.name}".`);
         
         if (getFileName(normalizedPath) === ".gitkeep") {
           // Folder creation
@@ -223,6 +227,7 @@ export async function POST(
         contentName: data.name,
         user: user.email || user.name || String(user.id || ""),
         onConflict,
+        authorize: (candidate, operation) => access.assert(candidate, operation),
         committer,
       }
     );
@@ -304,6 +309,7 @@ const githubSaveFile = async (
     contentName?: string;
     user?: string;
     onConflict?: "rename" | "error";
+    authorize: (path: string, operation: "create" | "update") => void;
     committer?: { name: string; email: string };
   },
 ) => {
@@ -328,6 +334,7 @@ const githubSaveFile = async (
   });
 
   try {
+    options?.authorize(path, sha ? "update" : "create");
     // First attempt: try with original path
     const response = await octokit.rest.repos.createOrUpdateFileContents({
       owner,
@@ -423,6 +430,7 @@ const githubSaveFile = async (
           }),
         });
         try {
+          options?.authorize(newPath, "create");
           const response = await octokit.rest.repos.createOrUpdateFileContents({
             owner,
             repo,
@@ -456,7 +464,8 @@ export async function DELETE(
     if ("response" in sessionResult) return sessionResult.response;
     const user = sessionResult.user;
 
-    const { token } = await getToken(user, params.owner, params.repo, true);
+    const { token, source } = await getToken(user, params.owner, params.repo, true);
+    const access = await getRepoAccess(user, params.owner, params.repo, token, source);
     if (!token) throw new Error("Token not found");
 
     if (!isContentOperationAllowed("delete", { scope: "settings" }) && params.path === ".pages.yml") {
@@ -477,7 +486,8 @@ export async function DELETE(
     });
     if (!config) throw new Error(`Configuration not found for ${params.owner}/${params.repo}/${params.branch}.`);
 
-    const normalizedPath = normalizePath(params.path);
+    const normalizedPath = canonicalRepoPath(params.path);
+    access.assert(normalizedPath, "delete");
     let schema;
     let schemaCommitTemplates: Record<string, string> | undefined;
     let schemaCommitIdentity: "app" | "user" | undefined;
@@ -494,7 +504,7 @@ export async function DELETE(
         schemaCommitTemplates = schema?.commit?.templates;
         schemaCommitIdentity = schema?.commit?.identity;
         
-        if (!normalizedPath.startsWith(schema.path)) throw new Error(`Invalid path "${params.path}" for ${type} "${name}".`);
+        if (!(schema.type === "file" ? normalizedPath === schema.path : (!schema.path || normalizedPath.startsWith(schema.path.replace(/\/$/, "") + "/")))) throw new Error(`Invalid path "${params.path}" for ${type} "${name}".`);
         
         if (schema.subfolders === false && getParentPath(normalizedPath) !== schema.path) {
           throw new Error(`Subfolders are not allowed for collection "${name}".`);
@@ -510,7 +520,7 @@ export async function DELETE(
         schemaCommitTemplates = schema?.commit?.templates;
         schemaCommitIdentity = schema?.commit?.identity;
 
-        if (!normalizedPath.startsWith(schema.input)) throw new Error(`Invalid path "${params.path}" for media "${name}".`);
+        if (!(!schema.input || normalizedPath.startsWith(schema.input.replace(/\/$/, "") + "/"))) throw new Error(`Invalid path "${params.path}" for media "${name}".`);
 
         if (
           schema.extensions?.length > 0 &&

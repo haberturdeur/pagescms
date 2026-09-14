@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRepoPermissions } from "@/hooks/use-repo-permissions";
 import { useRepo } from "@/contexts/repo-context";
 import { useConfig } from "@/contexts/config-context";
 import { Input } from "@/components/ui/input"
@@ -13,6 +14,7 @@ import { Check, Loader } from "lucide-react";
 export function RepoBranches() {
   const { owner, repo, branches, setBranches } = useRepo();
   const { config } = useConfig();
+  const permissions = useRepoPermissions({ owner, repo, branch: config?.branch || branches?.[0] || "main" });
 
   const [search, setSearch] = useState("");
   const [filteredBranches, setFilteredBranches] = useState<string[] | undefined>([]);
@@ -33,7 +35,7 @@ export function RepoBranches() {
   }, []);
 
   const handleCreateBranch = async () => {
-    if (config) {
+    if (config && permissions.repositoryActions) {
       // TODO: do we ask the user to confirm?
       if (search || isValidBranchName(search)) {
         setIsSubmitting(true);
@@ -77,7 +79,7 @@ export function RepoBranches() {
           onChange={(e) => setSearch(e.target.value)}
         />
         <Button
-          disabled={!search || !isValidBranchName(search) || branches.includes(search) || isSubmitting}
+          disabled={!permissions.repositoryActions || !search || !isValidBranchName(search) || branches.includes(search) || isSubmitting}
           onClick={handleCreateBranch}>
           Create
           {isSubmitting && (<Loader className="ml-2 h-4 w-4 animate-spin" />)}

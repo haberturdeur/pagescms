@@ -1,5 +1,7 @@
 "use client";
 
+import { useRepoPermissions } from "@/hooks/use-repo-permissions";
+
 import {
   Fragment,
   memo,
@@ -182,6 +184,7 @@ export function Collection({ name, path }: { name: string; path?: string }) {
 
   const { config } = useConfig();
   if (!config) throw new Error(`Configuration not found.`);
+  const permissions = useRepoPermissions(config);
 
   const schema = useMemo(
     () => getSchemaByName(config?.object, name),
@@ -191,7 +194,7 @@ export function Collection({ name, path }: { name: string; path?: string }) {
   if (schema.type !== "collection")
     throw new Error(`"${name}" is not a collection.`);
   const operations = useMemo(() => resolveContentOperations({ schema }), [schema]);
-  const canCreate = operations.create;
+  const canCreate = operations.create && permissions.canCreate(path || schema.path);
   const canRename = operations.rename;
   const canDelete = operations.delete;
 
@@ -550,7 +553,7 @@ export function Collection({ name, path }: { name: string; path?: string }) {
                 )}
                 href={`/${config.owner}/${config.repo}/${encodeURIComponent(config.branch)}/collection/${name}/edit/${encodeURIComponent(row.original.path)}`}
               >
-                Edit
+                {permissions.can(row.original.path, "update") ? "Edit" : "View"}
               </Link>
               <FileOptions
                 path={row.original.path}
@@ -653,6 +656,7 @@ export function Collection({ name, path }: { name: string; path?: string }) {
 
     return tableColumns;
   }, [
+    permissions.can,
     config.owner,
     config.repo,
     config.branch,

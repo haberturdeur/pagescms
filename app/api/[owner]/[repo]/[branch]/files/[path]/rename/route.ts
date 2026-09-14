@@ -1,8 +1,10 @@
+import { getRepoAccess } from "@/lib/repo-access";
+import { canonicalRepoPath } from "@/lib/repo-permissions";
 import { createOctokitInstance } from "@/lib/utils/octokit";
 import { isContentOperationAllowed } from "@/lib/operations";
 import { getSchemaByName } from "@/lib/schema";
 import { getConfig } from "@/lib/config-store";
-import { getFileExtension, normalizePath } from "@/lib/utils/file";
+import { getFileExtension } from "@/lib/utils/file";
 import { getToken } from "@/lib/token";
 import { updateFileCache } from "@/lib/github-cache-file";
 import { createHttpError, toErrorResponse } from "@/lib/api-error";
@@ -28,7 +30,8 @@ export async function POST(
     if ("response" in sessionResult) return sessionResult.response;
     const user = sessionResult.user;
 
-    const { token } = await getToken(user, params.owner, params.repo, true);
+    const { token, source } = await getToken(user, params.owner, params.repo, true);
+    const access = await getRepoAccess(user, params.owner, params.repo, token, source);
     if (!token) throw new Error("Token not found");
 
     if (!isContentOperationAllowed("rename", { scope: "settings" }) && params.path === ".pages.yml") {
@@ -46,8 +49,10 @@ export async function POST(
     if (!data.name && data.type === "content") throw new Error(`"name" is required.`);
     if (!data.newPath) throw new Error(`"newPath" is required.`);
 
-    const normalizedPath = normalizePath(params.path);
-    const normalizedNewPath = normalizePath(data.newPath);
+    const normalizedPath = canonicalRepoPath(params.path);
+    const normalizedNewPath = canonicalRepoPath(data.newPath);
+    access.assert(normalizedPath, "delete");
+    access.assert(normalizedNewPath, "create");
     if (normalizedPath === normalizedNewPath) throw new Error(`New path "${data.newPath}" is the same as the old path.`);
 
     let schema;
@@ -68,8 +73,8 @@ export async function POST(
 
         if (schema.type === "file") throw new Error(`Renaming content of type "file" isn't allowed.`);
         
-        if (!normalizedPath.startsWith(schema.path)) throw new Error(`Invalid path "${params.path}" for ${data.type} "${data.name}".`);
-        if (!normalizedNewPath.startsWith(schema.path)) throw new Error(`Invalid path "${data.newPath}" for ${data.type} "${data.name}".`);
+        if (!(!schema.path || normalizedPath.startsWith(schema.path.replace(/\/$/, "") + "/"))) throw new Error(`Invalid path "${params.path}" for ${data.type} "${data.name}".`);
+        if (!(!schema.path || normalizedNewPath.startsWith(schema.path.replace(/\/$/, "") + "/"))) throw new Error(`Invalid path "${data.newPath}" for ${data.type} "${data.name}".`);
 
         if (getFileExtension(normalizedPath) !== (schema.extension ?? "")) throw new Error(`Invalid extension "${getFileExtension(normalizedPath)}" for ${data.type} "${data.name}".`);
         if (getFileExtension(normalizedNewPath) !== (schema.extension ?? "")) throw new Error(`Invalid extension "${getFileExtension(normalizedNewPath)}" for ${data.type} "${data.name}".`);
@@ -82,8 +87,8 @@ export async function POST(
         schemaCommitTemplates = schema?.commit?.templates;
         schemaCommitIdentity = schema?.commit?.identity;
         
-        if (!normalizedPath.startsWith(schema.input)) throw new Error(`Invalid path "${params.path}" for media.`);
-        if (!normalizedNewPath.startsWith(schema.input)) throw new Error(`Invalid path "${data.newPath}" for media.`);
+        if (!(!schema.input || normalizedPath.startsWith(schema.input.replace(/\/$/, "") + "/"))) throw new Error(`Invalid path "${params.path}" for media.`);
+        if (!(!schema.input || normalizedNewPath.startsWith(schema.input.replace(/\/$/, "") + "/"))) throw new Error(`Invalid path "${data.newPath}" for media.`);
         
         if (
           schema.extensions?.length > 0 &&
@@ -195,19 +200,21 @@ const githubRenameFile = async (
   const tree = treeData.tree;
 
   // Step 3: Create a new tree with the updated path
-  const newTree = tree
-    .filter(item => item.type !== 'tree')
-    .map(item => ({
-      path: item.path === path ? newPath : item.path,
-      mode: item.mode as "100644" | "100755" | "040000" | "160000" | "120000",
-      type: item.type as "commit" | "tree" | "blob",
-      sha: item.sha,
-    }));
-
+  if (treeData.truncated) throw createHttpError("Repository tree is too large to rename safely.", 409);
+  const original = tree.find(item => item.path === path);
+  if (!original || original.type !== "blob" || !["100644", "100755"].includes(original.mode || "")) {
+    throw createHttpError("Only regular files can be renamed.", 400);
+  }
+  if (tree.some(item => item.path === newPath || item.path?.startsWith(newPath + "/")
+    || (item.type !== "tree" && newPath.startsWith(item.path + "/")))) {
+    throw createHttpError("Rename destination already exists or is not a directory.", 409);
+  }
   const { data: newTreeData } = await octokit.rest.git.createTree({
-    owner,
-    repo,
-    tree: newTree,
+    owner, repo, base_tree: treeData.sha,
+    tree: [
+      { path, mode: original.mode as "100644" | "100755", type: "blob", sha: null },
+      { path: newPath, mode: original.mode as "100644" | "100755", type: "blob", sha: original.sha },
+    ],
   });
   const newTreeSha = newTreeData.sha;
 

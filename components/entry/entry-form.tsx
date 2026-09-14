@@ -1028,6 +1028,8 @@ const SingleField = ({
 SingleField.displayName = "SingleField";
 
 const EntryForm = ({
+  readonly = false,
+  readonlyMessage = "You have read-only access to this page.",
   fields,
   contentObject,
   onSubmit = () => {},
@@ -1035,6 +1037,8 @@ const EntryForm = ({
   onDirtyChange,
   onChangeRegistered,
 }: {
+  readonly?: boolean;
+  readonlyMessage?: string;
   fields: Field[];
   contentObject?: Record<string, unknown>;
   onSubmit: (values: Record<string, unknown>) => void;
@@ -1140,9 +1144,9 @@ const EntryForm = ({
   const handleSubmit = useCallback(
     async (values: Record<string, unknown>) => {
       const latestValues = form.getValues() as Record<string, unknown>;
-      await onSubmit(latestValues);
+      if (!readonly) await onSubmit(latestValues);
     },
-    [form, onSubmit],
+    [form, onSubmit, readonly],
   );
 
   const handleError = () => {
@@ -1165,13 +1169,14 @@ const EntryForm = ({
         onSubmit={handleFormSubmit}
         className="w-full max-w-screen-md mx-auto grid items-start gap-6"
       >
+        {readonly && <p role="status" className="text-sm text-muted-foreground">{readonlyMessage}</p>}
         {filePath && (
           <div className="space-y-2 overflow-hidden">
             <FormLabel>Filename</FormLabel>
             {filePath}
           </div>
         )}
-        {renderFields(fields, undefined, registerBeforeSubmitHook, runBeforeValidationHooks)}
+        {renderFields(fields, undefined, registerBeforeSubmitHook, runBeforeValidationHooks, readonly)}
       </form>
     </Form>
   );

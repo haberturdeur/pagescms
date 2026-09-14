@@ -1,3 +1,4 @@
+import { getRepoAccess } from "@/lib/repo-access";
 import { and, desc, eq, inArray, isNull, isNotNull, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { actionRunTable } from "@/db/schema";
@@ -350,7 +351,9 @@ export async function POST(
     if ("response" in sessionResult) return sessionResult.response;
     const user = sessionResult.user;
 
-    const { token } = await getToken(user, params.owner, params.repo, true);
+    const { token, source } = await getToken(user, params.owner, params.repo, true);
+    const access = await getRepoAccess(user, params.owner, params.repo, token, source);
+    access.assertRepositoryAction();
     const octokit = createOctokitInstance(token);
 
     const body = (await request.json()) as {

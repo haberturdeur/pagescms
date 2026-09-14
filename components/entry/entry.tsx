@@ -1,5 +1,7 @@
 "use client";
 
+import { useRepoPermissions } from "@/hooks/use-repo-permissions";
+
 import { Fragment, useEffect, useState, useMemo, useCallback, useRef } from "react";
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
@@ -116,6 +118,7 @@ export function Entry({
   
   const { config } = useConfig();
   if (!config) throw new Error(`Configuration not found.`);
+  const permissions = useRepoPermissions(config);
   
   const schema = useMemo(() => {
     if (!name) return;
@@ -133,9 +136,10 @@ export function Entry({
       }),
     [initialPath, path, schema],
   );
-  const canCreate = operations.create;
-  const canRename = operations.rename;
-  const canDelete = operations.delete;
+  const canCreate = operations.create && (schemaType === "file" ? permissions.can(schema.path, "create") : permissions.canCreate(parent || schema?.path || ""));
+  const canEdit = path ? permissions.can(path, sha ? "update" : "create") : canCreate;
+  const canRename = operations.rename && Boolean(path && permissions.can(path, "delete"));
+  const canDelete = operations.delete && Boolean(path && permissions.can(path, "delete"));
   const isFileEditorMode = !schema?.fields || schema.fields.length === 0;
   const filenameFieldMode = useMemo(() => {
     if (!schema || schema.type !== "collection") return "hidden";
@@ -683,7 +687,7 @@ export function Entry({
             type="submit"
             form="entry-form"
             disabled={
-              isBusy ||
+              !canEdit || isBusy ||
               (showFilenameField && filenameValue.trim().length === 0) ||
               (
                 Boolean(path) &&
@@ -730,7 +734,7 @@ export function Entry({
         </div>
       )}
     </div>
-  ), [breadcrumbNode, canDelete, canRename, filenameChanged, filenameFieldMode, filenameValue, handleDelete, handleRename, hasRegisteredChanges, headerActionsNode, headerMeta, historyData, isBusy, isFilenameUnlocked, isFormDirty, isLoading, name, path, schemaType, sha, showFilenameField, showHeaderActions]);
+  ), [breadcrumbNode, canEdit, canDelete, canRename, filenameChanged, filenameFieldMode, filenameValue, handleDelete, handleRename, hasRegisteredChanges, headerActionsNode, headerMeta, historyData, isBusy, isFilenameUnlocked, isFormDirty, isLoading, name, path, schemaType, sha, showFilenameField, showHeaderActions]);
 
   useRepoHeader({ header: headerNode });
 
@@ -841,17 +845,19 @@ export function Entry({
     isLoading
       ? loadingSkeleton
       : <EntryForm
+        readonly={!canEdit}
+        readonlyMessage={permissions.error ? "Permissions could not be loaded. Editing is disabled." : permissions.ready ? "You have read-only access to this page." : "Loading permissions…"}
         fields={entryFields}
         contentObject={entryContentObject}
         onSubmit={onSubmit}
         filePath={
           showFilenameField
-            ? <InputGroup data-disabled={path ? !isFilenameUnlocked : false}>
+            ? <InputGroup data-disabled={!canEdit || (path ? !isFilenameUnlocked : false)}>
                 <InputGroupInput
                   value={filenameValue}
                   onChange={(event) => setFilenameValue(event.target.value)}
                   placeholder="Filename"
-                  disabled={path ? !isFilenameUnlocked : false}
+                  disabled={!canEdit || (path ? !isFilenameUnlocked : false)}
                   aria-label="Filename"
                 />
                 {path && filenameFieldMode === "enabled" && canRename && (

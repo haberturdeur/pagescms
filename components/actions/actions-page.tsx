@@ -1,5 +1,7 @@
 "use client";
 
+import { useRepoPermissions } from "@/hooks/use-repo-permissions";
+
 import Link from "next/link";
 import { forwardRef, useCallback, useEffect, useMemo, useState } from "react";
 import { formatDistanceToNowStrict } from "date-fns";
@@ -313,6 +315,7 @@ export function ActionsPage({
   actionLabels = {},
   contextLabels = {},
 }: ActionsPageProps) {
+  const permissions = useRepoPermissions({ owner, repo, branch });
   const { trackActionRun } = useActionToasts();
   const [runs, setRuns] = useState<ActionRunSummary[] | null>(null);
   const [search, setSearch] = useState("");
@@ -772,14 +775,14 @@ export function ActionsPage({
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
-                        disabled={!run.canRerun}
+                        disabled={!permissions.repositoryActions || !run.canRerun}
                         onClick={() => void handleRunAction(run, "rerun")}
                       >
                         Run again
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         variant="destructive"
-                        disabled={!run.canCancel}
+                        disabled={!permissions.repositoryActions || !run.canCancel}
                         onClick={() => void handleRunAction(run, "cancel")}
                       >
                         Cancel run

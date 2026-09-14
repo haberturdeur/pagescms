@@ -1,3 +1,4 @@
+import { getRepoAccess } from "@/lib/repo-access";
 import { and, eq, isNotNull, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { actionRunTable } from "@/db/schema";
@@ -241,7 +242,9 @@ export async function POST(
       throw createHttpError("Action run not found.", 404);
     }
 
-    const { token } = await getToken(user, params.owner, params.repo, true);
+    const { token, source } = await getToken(user, params.owner, params.repo, true);
+    const access = await getRepoAccess(user, params.owner, params.repo, token, source);
+    access.assertRepositoryAction();
     const octokit = createOctokitInstance(token);
     const isGithubUser = hasGithubIdentity(user);
     const isOwnRun = (row.triggeredBy as { userId?: string | null } | null)?.userId === user.id;

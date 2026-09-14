@@ -1,5 +1,7 @@
 "use client";
 
+import { useRepoPermissions } from "@/hooks/use-repo-permissions";
+
 import { useState } from "react";
 import { useConfig } from "@/contexts/config-context";
 import { joinPathSegments, normalizePath } from "@/lib/utils/file";
@@ -37,6 +39,7 @@ const FolderCreate = ({
 }) => {
   const { config } = useConfig();
   if (!config) throw new Error(`Configuration not found.`);
+  const permissions = useRepoPermissions(config);
 
   const [open, setOpen] = useState(false);
   const [folderPath, setFolderPath] = useState("");
@@ -102,6 +105,8 @@ const FolderCreate = ({
       setIsSubmitting(false);
     }
   };
+
+  if (!permissions.canCreate(path)) return null;
 
   return (
     <Dialog

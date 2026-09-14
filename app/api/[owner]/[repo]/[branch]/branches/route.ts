@@ -1,3 +1,4 @@
+import { getRepoAccess } from "@/lib/repo-access";
 import { createOctokitInstance } from "@/lib/utils/octokit";
 import { getToken } from "@/lib/token";
 import { createHttpError, toErrorResponse } from "@/lib/api-error";
@@ -21,7 +22,9 @@ export async function POST(
     if ("response" in sessionResult) return sessionResult.response;
     const user = sessionResult.user;
 
-    const { token } = await getToken(user, params.owner, params.repo, true);
+    const { token, source } = await getToken(user, params.owner, params.repo, true);
+    const access = await getRepoAccess(user, params.owner, params.repo, token, source);
+    access.assertRepositoryAction();
     if (!token) throw createHttpError("Token not found", 401);
 
     const data: any = await request.json();

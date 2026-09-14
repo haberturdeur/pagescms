@@ -149,8 +149,8 @@ const canAccessRepoWithToken = async (
 ) => {
   try {
     const octokit = createOctokitInstance(token);
-    await octokit.rest.repos.get({ owner, repo });
-    return true;
+    const { data } = await octokit.rest.repos.get({ owner, repo });
+    return data.permissions?.push === true;
   } catch {
     return false;
   }

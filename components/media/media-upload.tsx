@@ -1,5 +1,7 @@
 "use client";
 
+import { useRepoPermissions } from "@/hooks/use-repo-permissions";
+
 import { useRef, cloneElement, useMemo, useCallback, createContext, useContext, useState } from "react";
 import { useConfig } from "@/contexts/config-context";
 import { getUploadFileName, joinPathSegments } from "@/lib/utils/file";
@@ -41,6 +43,7 @@ interface MediaUploadDropZoneProps {
 function MediaUploadRoot({ children, path, onUpload, media, extensions, multiple, rename, disabled = false }: MediaUploadProps) {
   const { config } = useConfig();
   if (!config) throw new Error(`Configuration not found.`);
+  const permissions = useRepoPermissions(config);
 
   const configMedia = useMemo(() => 
     media
@@ -48,6 +51,8 @@ function MediaUploadRoot({ children, path, onUpload, media, extensions, multiple
       : config.object.media[0],
     [media, config.object]
   );
+
+  disabled = disabled || !permissions.canCreate(path || configMedia?.input || "");
 
   const accept = useMemo(() => {
     if (!configMedia?.extensions && !extensions) return undefined;
@@ -171,6 +176,8 @@ function MediaUploadTrigger({ children }: MediaUploadTriggerProps) {
 
     context.handleFiles(validFiles);
   }, [context, filterAcceptedFiles]);
+
+  if (context.disabled) return null;
 
   return (
     <>
