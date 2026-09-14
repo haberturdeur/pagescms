@@ -795,6 +795,7 @@ const ConfigSchema = z
         z
           .object(
             {
+              preview: z.boolean().optional(),
               config: z
                 .boolean({
                   message: "'config' must be a boolean.",

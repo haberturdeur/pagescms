@@ -1,5 +1,6 @@
 "use client";
 
+import { RepoPreview } from "@/components/repo/repo-preview";
 import { useEffect } from "react";
 import { RepoSidebar } from "@/components/repo/repo-sidebar";
 import {
@@ -49,6 +50,7 @@ export function RepoLayout({ children }: { children: React.ReactNode }) {
         <RepoSidebar />
         <SidebarInset className="min-h-screen">
           <RepoHeader />
+          <RepoPreview />
           <main className="min-w-0 flex-1 p-4 md:p-6">{children}</main>
         </SidebarInset>
       </RepoHeaderProvider>
