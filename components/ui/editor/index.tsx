@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import SlashCommands from "./slash-command/commands";
+import { StyledBlock, applyBlockStyle, type BlockStyle } from "./block-styles";
 import type {
   ImagePickerContext,
   ImagePickerFileResult,
@@ -91,6 +92,7 @@ const UploadableImage = Image.extend({
 });
 
 export type EditorProps = {
+  styles?: BlockStyle[];
   value?: string;
   onChange?: (value: string) => void;
   disabled?: boolean;
@@ -152,6 +154,7 @@ type BlockType =
   | "codeBlock";
 
 type ActiveState = {
+  customStyle: string;
   blockType: BlockType;
   bold: boolean;
   italic: boolean;
@@ -162,6 +165,7 @@ type ActiveState = {
 };
 
 const defaultActiveState: ActiveState = {
+  customStyle: "",
   blockType: "paragraph",
   bold: false,
   italic: false,
@@ -244,6 +248,7 @@ const blockOptions: Array<{ value: BlockType; label: string }> = [
 ];
 
 export function Editor({
+  styles = [],
   value = "",
   onChange = () => undefined,
   disabled = false,
@@ -279,6 +284,7 @@ export function Editor({
 
   const editor = useEditor({
     extensions: [
+      StyledBlock.configure({ styles }),
       StarterKit.configure({
         link: false,
         underline: false,
@@ -424,6 +430,7 @@ export function Editor({
                     : "paragraph";
 
       return {
+        customStyle: currentEditor.getAttributes("cmsStyledBlock").style || "",
         blockType,
         bold: currentEditor.isActive("bold"),
         italic: currentEditor.isActive("italic"),
@@ -940,12 +947,17 @@ export function Editor({
       >
         <div className="flex flex-col gap-1">
           <div className="border-border bg-popover flex flex-nowrap items-center gap-0.5 overflow-x-auto rounded-md border p-1 shadow-sm whitespace-nowrap">
-            {!isInTable ? (
+            {!isInTable || styles.length > 0 || activeState.customStyle ? (
               <div className="group/native-select relative w-fit">
                 <select
                   id="block-style"
-                  value={activeState.blockType}
-                  onChange={(event) => setBlockType(event.target.value as BlockType)}
+                  value={activeState.customStyle ? `style:${activeState.customStyle}` : activeState.blockType}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    if (value.startsWith("style:")) applyBlockStyle(editor, value.slice(6));
+                    else if (value === "remove-custom-style") applyBlockStyle(editor, "");
+                    else setBlockType(value as BlockType);
+                  }}
                   disabled={disabled}
                   aria-label="Block style"
                   className="h-7 w-full appearance-none rounded-md border border-transparent bg-transparent px-2 pr-5.5 text-sm shadow-none outline-none hover:bg-accent focus-visible:outline-none focus-visible:ring-0 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
@@ -955,6 +967,19 @@ export function Editor({
                       {option.label}
                     </option>
                   ))}
+                  {(styles.length > 0 || activeState.customStyle) && (
+                    <optgroup label="Custom styles">
+                      {activeState.customStyle && !styles.some(style => style.name === activeState.customStyle) && (
+                        <option value={`style:${activeState.customStyle}`}>{activeState.customStyle}</option>
+                      )}
+                      {styles.map(style => (
+                        <option key={style.name} value={`style:${style.name}`}>{style.label}</option>
+                      ))}
+                      {activeState.customStyle && (
+                        <option value="remove-custom-style">Remove custom style</option>
+                      )}
+                    </optgroup>
+                  )}
                 </select>
                 <ChevronDownIcon
                   className="text-muted-foreground pointer-events-none absolute top-1/2 right-1.5 size-3.5 -translate-y-1/2 opacity-50"

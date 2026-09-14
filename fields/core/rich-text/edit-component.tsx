@@ -41,6 +41,7 @@ import {
 import type { ApiResponse, FileSaveData } from "@/types/api";
 import type { Field } from "@/types/field";
 import "./edit-component.css";
+import { normalizeBlockStyles, type BlockStyle } from "@/components/ui/editor/block-styles";
 
 type MediaSchema = {
   name: string;
@@ -51,6 +52,7 @@ type MediaSchema = {
 };
 
 type FieldOptions = {
+  styles?: BlockStyle[];
   format?: "html" | "markdown";
   switcher?: boolean;
   media?: false | string;
@@ -904,6 +906,7 @@ const EditComponent = forwardRef(
                 onChangeRegistered?.();
               }}
               format={format}
+              styles={normalizeBlockStyles(options.styles)}
               className="cn-editor"
               enableImages={Boolean(mediaConfig)}
               enableImagePasteDrop={Boolean(mediaConfig)}
