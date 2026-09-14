@@ -166,8 +166,10 @@ class Controller:
         try:
             self.update(key, job, status='building')
             url = f"https://api.github.com/repos/{job['repository']}/tarball/{job['sha']}"
-            request = urllib.request.Request(url, headers={'Authorization': 'Bearer ' + token,
-                'User-Agent': 'PagesCMS-preview', 'Accept': 'application/vnd.github+json'})
+            headers = {'User-Agent': 'PagesCMS-preview', 'Accept': 'application/vnd.github+json'}
+            if token:
+                headers['Authorization'] = 'Bearer ' + token
+            request = urllib.request.Request(url, headers=headers)
             with urllib.request.urlopen(request, timeout=60) as response:
                 archive = response.read(MAX_ARCHIVE + 1)
             del token, request
@@ -215,10 +217,14 @@ def serve(controller, secret):
             self.send_header('Cache-Control', 'no-store')
             self.send_header('Content-Length', str(len(encoded)))
             self.end_headers()
-            self.wfile.write(encoded)
+            if self.command != 'HEAD':
+                self.wfile.write(encoded)
 
         def do_POST(self):
             self.api(True)
+
+        def do_HEAD(self):
+            self.do_GET()
 
         def do_GET(self):
             parsed = urllib.parse.urlsplit(self.path)
@@ -245,8 +251,9 @@ def serve(controller, secret):
             self.send_header('Referrer-Policy', 'no-referrer')
             self.send_header('Cache-Control', 'no-store')
             self.end_headers()
-            with file.open('rb') as source:
-                shutil.copyfileobj(source, self.wfile)
+            if self.command != 'HEAD':
+                with file.open('rb') as source:
+                    shutil.copyfileobj(source, self.wfile)
 
         def api(self, post):
             if not hmac.compare_digest(self.headers.get('Authorization', ''), 'Bearer ' + secret):

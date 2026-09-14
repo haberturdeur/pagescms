@@ -58,11 +58,12 @@ class PreviewTests(unittest.TestCase):
     def test_success_publishes_complete_output_and_removes_source(self):
         with tempfile.TemporaryDirectory() as folder:
             controller = server.Controller(folder,'https://preview.example',{'owner/repo':'worker'})
-            with patch('server.urllib.request.urlopen', return_value=io.BytesIO(archive())), \
+            with patch('server.urllib.request.urlopen', return_value=io.BytesIO(archive())) as download, \
                  patch('server.run_worker', return_value=archive('index.html')), \
                  patch('server.subprocess.run'):
-                job = controller.submit('owner/repo','main','a'*40,'test-secret')
+                job = controller.submit('owner/repo','main','a'*40,'')
                 controller.pool.shutdown(wait=True)
+            self.assertNotIn('Authorization', download.call_args.args[0].headers)
             result = controller.status('owner/repo','main')
             self.assertEqual(result['status'], 'ready')
             self.assertTrue((Path(folder)/job['id']/'public'/'index.html').exists())
