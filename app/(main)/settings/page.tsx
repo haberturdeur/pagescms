@@ -1,5 +1,3 @@
-import { getSkautisConfig } from "@/lib/skautis/protocol";
-import { SkautisSignIn } from "@/components/skautis-sign-in";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { and, eq } from "drizzle-orm";
@@ -35,10 +33,6 @@ export default async function Page() {
     ),
   });
   const githubConnected = Boolean(githubAccount);
-  const skautis = getSkautisConfig();
-  const skautisAccount = skautis ? await db.query.accountTable.findFirst({
-    where: and(eq(accountTable.userId, user.id), eq(accountTable.providerId, skautis.providerId)),
-  }) : null;
   const githubManageUrl = process.env.GITHUB_APP_CLIENT_ID
     ? `https://github.com/settings/connections/applications/${process.env.GITHUB_APP_CLIENT_ID}`
     : null;
@@ -77,14 +71,6 @@ export default async function Page() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {skautis && (
-                <div className="mb-4 space-y-2">
-                  <p className="text-sm text-muted-foreground">
-                    {skautisAccount ? "SkautIS is connected to your account." : "Connect SkautIS to sign in with your Scout account next time. Sign in again before connecting."}
-                  </p>
-                  <SkautisSignIn mode="link" connected={Boolean(skautisAccount)} />
-                </div>
-              )}
               <Identities
                 email={user.email}
                 githubConnected={githubConnected}

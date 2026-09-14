@@ -1,6 +1,5 @@
 "use client";
 
-import { SkautisSignIn } from "@/components/skautis-sign-in";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { emailOtp, signIn } from "@/lib/auth-client";
@@ -11,7 +10,7 @@ import { OtpVerificationForm } from "@/components/otp-verification-form";
 import { toast } from "sonner";
 import { Loader } from "lucide-react";
 
-export function SignIn({ skautisEnabled = false }: { skautisEnabled?: boolean }) {
+export function SignIn() {
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [step, setStep] = useState<"email" | "otp">("email");
@@ -201,7 +200,6 @@ export function SignIn({ skautisEnabled = false }: { skautisEnabled?: boolean })
                 <Loader className="size-4 animate-spin" />
               )}
             </Button>
-            {skautisEnabled && <SkautisSignIn />}
             <div className="relative text-center">
               <div className="absolute inset-0 flex items-center">
                 <hr className="border-t w-full" />

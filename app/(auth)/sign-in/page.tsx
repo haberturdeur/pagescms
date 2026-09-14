@@ -1,4 +1,3 @@
-import { getSkautisConfig } from "@/lib/skautis/protocol";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
@@ -19,6 +18,6 @@ export default async function Page({
   if (session?.user) return redirect(safeRedirect === "/sign-in" ? "/" : safeRedirect);
 
 	return (
-    <SignIn skautisEnabled={Boolean(getSkautisConfig())} />
+    <SignIn/>
   );
 }

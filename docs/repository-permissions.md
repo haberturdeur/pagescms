@@ -31,9 +31,9 @@ rules:
 ```
 
 Use paths matching your site's actual files, including media uploads. Groups are
-lists of verified account emails, compared case-insensitively. A linked SkautIS
-login uses the same account's verified email. Group membership does not itself
-grant repository access: invite the collaborator through Pages CMS first.
+lists of verified account emails, compared case-insensitively. Group membership
+does not itself grant repository access: invite the collaborator through Pages
+CMS first.
 
 Rules grant `create`, `update`, and `delete` by default. To allow editing existing
 files only, add `operations: [update]` to a rule. Memberships and matching rules
@@ -78,4 +78,4 @@ npm run build
 ```
 
 The tests run the policy loader and actual mutation routes against simulated
-GitHub responses. They do not write to GitHub or require a live SkautIS account.
+GitHub responses. They do not write to GitHub or require external accounts.
