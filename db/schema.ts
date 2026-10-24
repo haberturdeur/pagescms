@@ -52,7 +52,9 @@ const accountTable = pgTable("account", {
   updatedAt: timestamp("updated_at").notNull().defaultNow()
 }, table => ({
   idx_account_userId: index("idx_account_userId").on(table.userId),
-  idx_account_providerId: index("idx_account_providerId").on(table.providerId)
+  idx_account_providerId: index("idx_account_providerId").on(table.providerId),
+  uq_account_skautis_identity: uniqueIndex("uq_account_skautis_identity").on(table.accountId).where(sql`${table.providerId} = 'skautis'`),
+  uq_account_skautis_user: uniqueIndex("uq_account_skautis_user").on(table.userId).where(sql`${table.providerId} = 'skautis'`),
 }));
 
 const verificationTable = pgTable("verification", {

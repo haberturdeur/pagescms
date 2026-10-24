@@ -1,0 +1,2 @@
+CREATE UNIQUE INDEX "uq_account_skautis_identity" ON "account" USING btree ("account_id") WHERE "account"."provider_id" = 'skautis';--> statement-breakpoint
+CREATE UNIQUE INDEX "uq_account_skautis_user" ON "account" USING btree ("user_id") WHERE "account"."provider_id" = 'skautis';

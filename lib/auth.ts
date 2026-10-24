@@ -11,6 +11,7 @@ import { syncGithubProfileOnLogin } from "@/lib/github-account";
 import { bindCollaboratorInvitesToUser } from "@/lib/collaborator-access";
 import { LoginEmailTemplate } from "@/components/email/login";
 import { render } from "@react-email/render";
+import { skautis } from "@/lib/skautis/plugin";
 
 export const auth = betterAuth({
   baseURL: getBaseUrl(),
@@ -154,6 +155,7 @@ export const auth = betterAuth({
     },
   },
   plugins: [
+    skautis(),
     nextCookies(),
     emailOTP({
       expiresIn: 300,

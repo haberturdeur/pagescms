@@ -8,6 +8,7 @@
   "version": "2.1.8",
   "private": true,
   "scripts": {
+    "test:skautis": "node --test scripts/test-skautis.mjs",
     "setup:github-app": "node scripts/setup-github-app.mjs",
     "dev": "next dev",
     "build": "next build",
@@ -63,6 +64,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",
     "drizzle-orm": "^0.45.1",
+    "fast-xml-parser": "^5.11.2",
     "input-otp": "^1.4.2",
     "joplin-turndown-plugin-gfm": "^1.0.12",
     "lodash.merge": "^4.6.2",

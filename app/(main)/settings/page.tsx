@@ -19,8 +19,11 @@ import {
 } from "@/components/ui/card";
 import { ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getSkautisConfig } from "@/lib/skautis/config";
+import { SkautisSignIn } from "@/components/skautis-sign-in";
 
-export default async function Page() {
+export default async function Page({ searchParams }: { searchParams: Promise<{ skautis?: string; error?: string }> }) {
+  const notice = await searchParams;
   const session = await auth.api.getSession({
     headers: await headers(),
   });
@@ -33,6 +36,10 @@ export default async function Page() {
     ),
   });
   const githubConnected = Boolean(githubAccount);
+  const skautisEnabled = Boolean(getSkautisConfig());
+  const skautisAccount = skautisEnabled ? await db.query.accountTable.findFirst({
+    where: and(eq(accountTable.userId, user.id), eq(accountTable.providerId, "skautis")),
+  }) : null;
   const githubManageUrl = process.env.GITHUB_APP_CLIENT_ID
     ? `https://github.com/settings/connections/applications/${process.env.GITHUB_APP_CLIENT_ID}`
     : null;
@@ -79,6 +86,18 @@ export default async function Page() {
               />
             </CardContent>
           </Card>
+
+          {skautisEnabled && <Card>
+            <CardHeader>
+              <CardTitle>skautIS</CardTitle>
+              <CardDescription>Connect your scout account to sign in to this CMS with skautIS.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {notice.skautis === "connected" && <p role="status" className="text-sm">skautIS connected successfully.</p>}
+              {notice.error?.startsWith("skautis_") && <p role="alert" className="text-sm text-destructive">Could not connect skautIS. Your session may have expired, or the identity may already be connected. Please try again.</p>}
+              {skautisAccount ? <p className="text-sm">Your skautIS account is connected.</p> : <SkautisSignIn link />}
+            </CardContent>
+          </Card>}
 
           {githubConnected && (
             <Card>

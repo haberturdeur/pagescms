@@ -12,3 +12,7 @@ Configure a sender and SMTP or Resend for email delivery.
 Collaborator editing permissions can be restricted by verified email groups in
 [`.pages-access.yml`](repository-permissions.md). GitHub repository writers remain
 administrators.
+
+An optional [skautIS sign-in provider](skautis-sso.md) lets existing users connect
+their scout identity in Settings and use it for future sign-ins. Existing
+collaborator permissions continue to apply.

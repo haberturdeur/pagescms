@@ -9,8 +9,9 @@ import { Button } from "@/components/ui/button";
 import { OtpVerificationForm } from "@/components/otp-verification-form";
 import { toast } from "sonner";
 import { Loader } from "lucide-react";
+import { SkautisSignIn } from "@/components/skautis-sign-in";
 
-export function SignIn() {
+export function SignIn({ skautisEnabled = false }: { skautisEnabled?: boolean }) {
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [step, setStep] = useState<"email" | "otp">("email");
@@ -30,6 +31,8 @@ export function SignIn() {
       : `/sign-in?redirect=${encodeURIComponent(safeRedirect)}`;
 
   const getErrorMessage = (value: string) => {
+    if (value === "skautis_not_connected") return "First sign in with email or GitHub, then connect your skautIS account in Settings.";
+    if (value.startsWith("skautis_")) return "skautIS sign-in could not be completed. Please try again, or sign in with email or GitHub.";
     if (value.toLowerCase() !== "unable_to_get_user_info") return value;
     return [
       "GitHub denied profile access. Re-authorize Pages CMS in GitHub Settings > Applications > Authorized GitHub Apps / Authorized OAuth Apps, then try again.",
@@ -200,6 +203,7 @@ export function SignIn() {
                 <Loader className="size-4 animate-spin" />
               )}
             </Button>
+            {skautisEnabled && <SkautisSignIn redirect={safeRedirect} />}
             <div className="relative text-center">
               <div className="absolute inset-0 flex items-center">
                 <hr className="border-t w-full" />

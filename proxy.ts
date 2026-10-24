@@ -21,7 +21,8 @@ export function proxy(request: NextRequest) {
 		return NextResponse.next();
 	}
 
-	if (pathname.startsWith("/api/") && pathname !== "/api/webhook/github" && request.method !== "GET") {
+	const isSkautisCallback = pathname === "/api/skautis/callback" && request.method === "POST";
+	if (pathname.startsWith("/api/") && pathname !== "/api/webhook/github" && !isSkautisCallback && request.method !== "GET") {
 		const originHeader = request.headers.get("Origin");
 		const hostHeader = request.headers.get("Host");
 		if (!originHeader || !hostHeader || !isAllowedOrigin(originHeader, hostHeader)) {
