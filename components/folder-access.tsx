@@ -4,8 +4,7 @@ import { useEffect, useState } from "react";
 import { useConfig } from "@/contexts/config-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { FolderEditorPicker } from "@/components/folder-editor-picker";
 import { toast } from "sonner";
 
 type Folder = { directory?: string; directories: string[]; editors?: string[]; inheritedFrom?: string | null; branch: string; head?: string };
@@ -14,7 +13,9 @@ export function FolderAccess() {
   const { config } = useConfig();
   const [directory, setDirectory] = useState("");
   const [data, setData] = useState<Folder | null>(null);
-  const [editors, setEditors] = useState("");
+  const [editorText, setEditorText] = useState("");
+  const editors = [...new Set(editorText.split("\n").map(value => value.trim()).filter(Boolean))];
+  const [names, setNames] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const endpoint = config ? `/api/${config.owner}/${config.repo}/${encodeURIComponent(config.branch)}/folder-access` : "";
@@ -25,7 +26,7 @@ export function FolderAccess() {
       const response = await fetch(endpoint + (folder === undefined ? "" : `?directory=${encodeURIComponent(folder)}`), { cache: "no-store" });
       const result = await response.json();
       if (!response.ok) throw new Error(result.message || "Could not load folder permissions.");
-      setData(result); setEditors((result.editors || []).join("\n"));
+      setData(result); setEditorText((result.editors || []).join("\n"));
       if (result.directory !== undefined) setDirectory(result.directory);
     } catch (error) { setError(error instanceof Error ? error.message : "Could not load folder permissions."); }
     finally { setBusy(false); }
@@ -44,13 +45,11 @@ export function FolderAccess() {
     {error && <p role="alert" className="text-destructive">{error}</p>}
     {data?.head && <div className="space-y-3">
       {data.inheritedFrom !== null && data.inheritedFrom !== data.directory && <p className="text-sm">Currently inherited from {data.inheritedFrom || "/"}. Saving creates a rule for this folder.</p>}
-      <Label htmlFor="folder-editors">Allowed editors (one identity per line)</Label>
-      <Textarea id="folder-editors" rows={10} value={editors} onChange={event => setEditors(event.target.value)} disabled={busy} />
-      <p className="text-xs text-muted-foreground">Use skautIS identities such as skautis:test:1942 or skautis:production:123. An empty list blocks editing in this folder.</p>
+      <FolderEditorPicker endpoint={endpoint} directory={data.directory || ""} editors={editors} manualValue={editorText} onManualChange={setEditorText} names={names} onName={(identity, name) => setNames(current => ({ ...current, [identity]: name }))} onChange={values => setEditorText(values.join("\n"))} disabled={busy} />
       <Button disabled={busy || directory !== data.directory} onClick={async () => {
         setBusy(true); setError("");
         try {
-          const response = await fetch(endpoint, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ directory: data.directory, head: data.head, editors: editors.split("\n").map(value => value.trim()).filter(Boolean) }) });
+          const response = await fetch(endpoint, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ directory: data.directory, head: data.head, editors }) });
           const result = await response.json();
           if (!response.ok) throw new Error(result.message || "Could not save folder permissions.");
           toast.success("Folder editors updated."); await load(data.directory);

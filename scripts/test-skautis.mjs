@@ -15,6 +15,7 @@ const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'pagescms-skautis-test-'
 const originalFetch = globalThis.fetch;
 after(() => { globalThis.fetch = originalFetch; fs.rmSync(temporary, { recursive: true, force: true }); });
 const stubs = {
+  'lib/skautis/directory-session.ts': 'export async function saveSkautisDirectorySession(sessionId,value,expiresAt) { globalThis.fixture.savedDirectorySession={sessionId,value,expiresAt}; }',
   'lib/skautis/repositories.ts': 'export async function repositoriesForSkautisActor() { if(globalThis.fixture.accessError) throw Error("Unavailable"); return globalThis.fixture.admitted ? [{owner:"owner",repo:"repo"}] : []; }',
   'lib/skautis/store.ts': `
     export async function provisionSkautisUser(accountId,name) {
@@ -216,4 +217,16 @@ test('membership is rechecked on later logins and upstream policy failures fail 
   f.accessError=true;
   assert.match((await complete(await start())).headers.get('location'),/skautis_access_unavailable/);
   assert.equal(f.data.session.length,count);
+});
+
+test('upstream directory token is retained only for the authenticated CMS session',async()=>{
+  process.env.SKAUTIS_ONLY='true';process.env.SKAUTIS_REPOSITORIES='owner/repo';f.admitted=true;
+  const response=await complete(await start());
+  assert.equal(f.savedDirectorySession.value.token,token);
+  assert.equal(f.savedDirectorySession.value.accountId,'test:42');
+  assert.equal(f.savedDirectorySession.sessionId,f.data.session[0].id);
+  assert.ok(f.savedDirectorySession.expiresAt<=Date.now()+600001);
+  assert.equal(f.data.account[0].accessToken,undefined);
+  assert.ok(!response.headers.get('set-cookie').includes(token));
+  assert.ok(!response.headers.get('location').includes(token));
 });

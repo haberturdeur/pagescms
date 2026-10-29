@@ -9,6 +9,8 @@ server's `ID_User`; posted role/unit fields are ignored.
 1. Register an external application in test skautIS and obtain its AppID. Its
    callback is `https://YOUR-CMS-HOST/api/skautis/callback`; permit the `state`
    query parameter supplied in `ReturnUrl`. Enable `UserManagement.LoginDetail`.
+   The editor name picker also uses `UserManagement.UserRoleAll` and
+   `UserManagement.UserAll`.
 2. Set `BASE_URL` to the canonical HTTPS CMS origin, `SKAUTIS_APP_ID` to the
    AppID, and `SKAUTIS_ENVIRONMENT=test` (the default). Use a separately approved
    production AppID with `production` when ready. Only localhost may use HTTP.
@@ -16,7 +18,9 @@ server's `ID_User`; posted role/unit fields are ignored.
    credentials and `CRYPTO_KEY` (base64-encoded 32-byte AES key).
 4. Run `npm run db:migrate` in the intended deployment database. Migration
    `0013_skautis_identity` binds each skautIS identity to one CMS account and each
-   CMS account to one skautIS identity.
+   CMS account to one skautIS identity. Migration
+   `0014_skautis_directory_session` adds encrypted per-session upstream tokens
+   for administrator directory searches.
 5. Set `SKAUTIS_ONLY=true` and configure `SKAUTIS_REPOSITORIES`. Bootstrap
    `.admins` directly in Git as described in [folder permissions](folder-permissions.md).
 
@@ -52,7 +56,10 @@ cookie for one minute, then redirects to a GET where the original signed
 SameSite=Lax state cookie is available. That browser state must match a
 single-use, ten-minute database record, consumed by atomic `DELETE RETURNING`.
 An upstream token alone cannot create a CMS session. Tokens are never stored
-in URLs or permanent identity records. Only the exact POST callback bypasses
+in URLs or permanent identity records. For the editor picker, the validated
+token is encrypted in a separate CMS-session-owned row with the upstream expiry;
+CMS session deletion cascades to that row. Only a current folder administrator
+can use it to query the directory, and it is never returned to the browser. Only the exact POST callback bypasses
 the proxy's origin check; initiation remains same-origin protected.
 
 Verify a real browser login using a registered test AppID and a repository with

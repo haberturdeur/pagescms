@@ -20,7 +20,7 @@ const requireApiUserSession = async () => {
     return { response: new Response(null, { status: 401 }) };
   }
 
-  return { user: session.user };
+  return { user: session.user, session: session.session };
 };
 
 export { getServerSession, requireApiUserSession };

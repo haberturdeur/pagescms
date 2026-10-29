@@ -56,7 +56,9 @@ permission for another tree.
    identities. This is sufficient for those people to sign in, even before any
    `.access` exists.
 2. An administrator opens **Folder access** in the repository sidebar, selects
-   or enters a folder, and adds allowed editor identities, one per line.
+   or enters a folder, chooses a skautIS unit, and searches by name. **Add** puts
+   a selected account into the editor list; **Remove** removes it. **Save editors**
+   commits the list. An advanced manual identity editor remains available.
 3. Saving creates or updates only that folder's `.access`. Saving a nested rule
    copies the displayed inherited editor list unless the administrator changes
    it. An empty list intentionally blocks content editing in that subtree.
@@ -122,3 +124,36 @@ skautIS-only mode, but cannot bypass the `.admins` file protection or change
 Verification: `npm run test:skautis`, `npm run test:access`, `npx tsc --noEmit`
 and a production Next.js build. Tests run the real authentication and permission
 code with external services replaced; they never modify live repository grants.
+
+## Unit directory search
+
+The picker lists units from the signed-in administrator's active skautIS role
+assignments (`UserRoleAll`), then searches accounts by display name using
+`UserAll` with an explicit `ID_Unit`. The backend rejects unit IDs outside that
+list. Results contain only the display name, username and stable skautIS user
+identity; duplicate account rows are collapsed and disabled accounts omitted.
+Search requires two name characters and returns at most 50 unique accounts.
+
+Only a person authorized by the selected folder's effective `.admins` may use
+this directory endpoint. The administrator's own upstream permissions still
+apply. Selecting a unit does **not** grant access to a unit or save a unit-based
+rule: `.access` continues to store individual identities only.
+
+Run migration `0014_skautis_directory_session` before deploying the picker.
+After a successful login, its skautIS token is encrypted in a table keyed by the
+local CMS session, expires no later than either session, and is deleted when the
+CMS session is deleted. Expired rows are purged on the next login/save or read.
+It is never exposed to the browser or put into the permanent account record.
+Existing sessions must sign out and sign in again to initialize directory
+access; the same applies when skautIS's shorter session expires. Manual editor
+identity management remains usable independently of the directory.
+
+The test AppID was verified live on 2026-10-29 with the documented public
+středisko account: active role-unit listing and unit-scoped `UserAll` name
+filtering both succeeded. Production AppID grants must include `UserRoleAll`
+and `UserAll` as well as `LoginDetail`. No `PersonAll` or unit-role grant changes
+are needed for this picker.
+
+Additional verification: `npm run test:directory` exercises scoped search,
+folder-administrator authorization, safe user IDs, duplicate/disabled accounts,
+response minimization, encrypted session storage, expiry and upstream denials.

@@ -10,6 +10,7 @@ import { verifySkautisLogin } from "./client";
 import { consumeSkautisFlow, linkSkautisAccount, provisionSkautisUser, saveSkautisFlow, type SkautisFlow } from "./store";
 import { repositoriesForSkautisActor } from "./repositories";
 import { skautisOnly, skautisRepositories } from "./config";
+import { saveSkautisDirectorySession } from "./directory-session";
 
 export const skautis = (): BetterAuthPlugin => ({
   id: "skautis",
@@ -56,6 +57,7 @@ export const skautis = (): BetterAuthPlugin => ({
       ctx.setCookie(skautisHandoffCookie, "", options);
       ctx.setCookie(skautisStateCookie, "", options);
       let identity;
+      let upstreamToken: string;
       try {
         if (!cookie || !state || !/^[a-f0-9]{64}$/.test(state)) throw new Error("Missing state.");
         const encrypted = JSON.parse(Buffer.from(cookie, "base64url").toString("utf8"));
@@ -64,6 +66,7 @@ export const skautis = (): BetterAuthPlugin => ({
         flow = await consumeSkautisFlow(state);
         if (!flow) throw new Error("Expired or used state.");
         identity = await verifySkautisLogin(handoff.token);
+        upstreamToken = handoff.token;
       } catch {
         // Do not log upstream tokens, SOAP faults or callback payloads.
         return fail("skautis_failed");
@@ -74,6 +77,7 @@ export const skautis = (): BetterAuthPlugin => ({
         if (!session || session.user.id !== flow.userId || session.session.id !== flow.sessionId) return fail("skautis_session_changed");
         try { await linkSkautisAccount(accountId, flow.userId); }
         catch { return fail("skautis_already_connected"); }
+        await saveSkautisDirectorySession(session.session.id, { token: upstreamToken, accountId, unitId: identity.unitId }, Math.min(identity.expiresAt, session.session.expiresAt.getTime()));
         throw ctx.redirect(new URL("/settings?skautis=connected", getBaseUrl()).toString());
       }
       let account = await ctx.context.internalAdapter.findAccountByProviderId(accountId, "skautis");
@@ -97,6 +101,7 @@ export const skautis = (): BetterAuthPlugin => ({
       if (!user) return fail("skautis_failed");
       const session = await ctx.context.internalAdapter.createSession(user.id);
       if (!session) return fail("skautis_failed");
+      await saveSkautisDirectorySession(session.id, { token: upstreamToken, accountId, unitId: identity.unitId }, Math.min(identity.expiresAt, session.expiresAt.getTime()));
       await setSessionCookie(ctx, { session, user });
       throw ctx.redirect(new URL(skautisRedirect(flow.redirect), getBaseUrl()).toString());
     }),

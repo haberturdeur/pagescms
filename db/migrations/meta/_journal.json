@@ -99,6 +99,13 @@
       "when": 1792800737533,
       "tag": "0013_skautis_identity",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1793287925711,
+      "tag": "0014_skautis_directory_session",
+      "breakpoints": true
     }
   ]
 }

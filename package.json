@@ -21,7 +21,8 @@
     "db:clear-cache": "npx tsx db/scripts/clear-cache.ts",
     "db:collaborators:export": "npx tsx db/scripts/collaborators/export.ts",
     "db:collaborators:import": "npx tsx db/scripts/collaborators/import.ts",
-    "test:access": "node --test scripts/test-repo-permissions.mjs scripts/test-skautis-access.mjs"
+    "test:access": "node --test scripts/test-repo-permissions.mjs scripts/test-skautis-access.mjs",
+    "test:directory": "node --test scripts/test-editor-directory.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",

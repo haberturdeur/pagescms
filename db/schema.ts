@@ -36,6 +36,13 @@ const sessionTable = pgTable("session", {
   idx_session_userId: index("idx_session_userId").on(table.userId)
 }));
 
+const skautisDirectorySessionTable = pgTable("skautis_directory_session", {
+  sessionId: text("session_id").primaryKey().references(() => sessionTable.id, { onDelete: "cascade" }),
+  ciphertext: text("ciphertext").notNull(),
+  iv: text("iv").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+});
+
 const accountTable = pgTable("account", {
   id: text("id").notNull().primaryKey(),
   accountId: text("account_id").notNull(),
@@ -214,6 +221,7 @@ const actionRunTable = pgTable("action_run", {
 export {
   userTable,
   sessionTable,
+  skautisDirectorySessionTable,
   accountTable,
   verificationTable,
   githubInstallationTokenTable,

@@ -1,31 +1,11 @@
 import { stringify } from "yaml";
 import { z } from "zod";
-import { requireApiUserSession } from "@/lib/session-server";
-import { getToken } from "@/lib/token";
-import { getSkautisAccount } from "@/lib/skautis/account";
-import { effectiveFolderGrants, parseFolderList, readFolderPolicies } from "@/lib/folder-policy";
-import { canManageFolderAccess, canonicalRepoPath } from "@/lib/repo-permissions";
+import { parseFolderList } from "@/lib/folder-policy";
+import { canManageFolderAccess } from "@/lib/repo-permissions";
 import { createOctokitInstance } from "@/lib/utils/octokit";
 import { createHttpError, toErrorResponse } from "@/lib/api-error";
 
-type Context = { params: Promise<{ owner: string; repo: string; branch: string }> };
-
-async function management(context: Context) {
-  const session = await requireApiUserSession();
-  if ("response" in session) throw createHttpError("Not signed in.", 401);
-  const { owner, repo } = await context.params;
-  const { token } = await getToken(session.user, owner, repo);
-  const policies = await readFolderPolicies(token, owner, repo);
-  const account = await getSkautisAccount(session.user.id);
-  const actor = { ...session.user, skautisAccountId: account?.accountId };
-  const permissions = { admin: false, restricted: true, rules: [], folderAdmins: effectiveFolderGrants(policies.admins, actor) };
-  return { owner, repo, token, policies, permissions };
-}
-
-function validateDirectory(directory: string) {
-  if (directory) { try { canonicalRepoPath(directory); } catch { throw createHttpError("Invalid folder path.", 400); } }
-  return directory;
-}
+import { getFolderManagement as management, validateFolderDirectory as validateDirectory, type FolderManagementContext as Context } from "@/lib/folder-management";
 
 export async function GET(request: Request, context: Context) {
   try {
