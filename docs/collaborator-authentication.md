@@ -13,6 +13,8 @@ Collaborator editing permissions can be restricted by verified email groups in
 [`.pages-access.yml`](repository-permissions.md). GitHub repository writers remain
 administrators.
 
-An optional [skautIS sign-in provider](skautis-sso.md) lets existing users connect
-their scout identity in Settings and use it for future sign-ins. Existing
-collaborator permissions continue to apply.
+[skautIS sign-in](skautis-sso.md) also supports direct admission through
+[folder `.access` and `.admins` lists](folder-permissions.md), without an email
+invitation or GitHub account. `SKAUTIS_ONLY=true` disables alternative login
+methods. The existing explicit account-connection workflow remains available
+for deployments that keep the legacy sign-in methods.

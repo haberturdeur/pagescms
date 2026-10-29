@@ -9,6 +9,9 @@ import { User } from "@/types/user";
 import { getGithubAccount } from "@/lib/github-account";
 import { requireGithubUserToken } from "@/lib/authz-server";
 import { hasGithubIdentity } from "@/lib/authz-shared";
+import { getSkautisRepositoriesForUser } from "@/lib/skautis/repositories";
+import { createOctokitInstance } from "@/lib/utils/octokit";
+import { skautisOnly } from "@/lib/skautis/config";
 import { collaboratorMatchesUser } from "@/lib/collaborator-access";
 
 const getAccounts = async (user: User) => {
@@ -18,6 +21,12 @@ const getAccounts = async (user: User) => {
     repositorySelection: string;
     installationId: number;
   }> = [];
+  const skautisRepositories = await getSkautisRepositoriesForUser(user);
+  for (const entry of skautisRepositories) {
+    const { data } = await createOctokitInstance(entry.token).rest.repos.get({ owner: entry.owner, repo: entry.repo });
+    accounts.push({ login: data.owner.login, type: data.owner.type === "User" ? "user" : "org", repositorySelection: "selected", installationId: 0 });
+  }
+  if (skautisOnly()) return Array.from(new Map(accounts.map(account => [account.login.toLowerCase(), account])).values());
   const githubAccount = await getGithubAccount(user.id);
 
 	if (githubAccount?.accessToken && hasGithubIdentity(user)) {

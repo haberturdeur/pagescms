@@ -17,6 +17,7 @@ Useful starting points:
 - [Install locally](https://pagescms.org/docs/guides/installing/)
 - [Create the GitHub App](https://pagescms.org/docs/guides/installing/github-app/)
 - [Environment variables](https://pagescms.org/docs/development/environment-variables/)
+- [skautIS sign-in and folder permissions](docs/folder-permissions.md)
 - [Upgrading to 2.x](https://pagescms.org/docs/guides/upgrading-to-2/)
 
 ## Use online
@@ -125,6 +126,7 @@ For more detail, see:
 - [Install locally](https://pagescms.org/docs/guides/installing/)
 - [Create the GitHub App](https://pagescms.org/docs/guides/installing/github-app/)
 - [Environment variables](https://pagescms.org/docs/development/environment-variables/)
+- [skautIS sign-in and folder permissions](docs/folder-permissions.md)
 - [Caching](https://pagescms.org/docs/development/caching/)
 
 ## Support the project

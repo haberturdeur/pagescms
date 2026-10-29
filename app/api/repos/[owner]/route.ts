@@ -8,6 +8,8 @@ import { getGithubAccount } from "@/lib/github-account";
 import { hasGithubIdentity } from "@/lib/authz-shared";
 import { toErrorResponse } from "@/lib/api-error";
 import { requireApiUserSession } from "@/lib/session-server";
+import { getSkautisRepositoriesForUser } from "@/lib/skautis/repositories";
+import { skautisOnly } from "@/lib/skautis/config";
 import { collaboratorMatchesUser } from "@/lib/collaborator-access";
 
 export const dynamic = "force-dynamic";
@@ -36,6 +38,13 @@ export async function GET(
     const searchParams = request.nextUrl.searchParams;
     const type = searchParams.get("type");
 
+    const skautisRepos = [];
+    for (const entry of await getSkautisRepositoriesForUser(user)) {
+      if (entry.owner.toLowerCase() !== params.owner.toLowerCase()) continue;
+      const { data } = await createOctokitInstance(entry.token).rest.repos.get({ owner: entry.owner, repo: entry.repo });
+      skautisRepos.push({ owner: data.owner.login, repo: data.name, private: data.private, defaultBranch: data.default_branch, updatedAt: data.updated_at });
+    }
+    if (skautisOnly()) return Response.json({ status: "success", data: skautisRepos });
     const githubAccount = await getGithubAccount(user.id);
     if (githubAccount?.accessToken && hasGithubIdentity(user)) {
       const token = githubAccount.accessToken;
@@ -81,7 +90,7 @@ export async function GET(
     });
 
     const reposByKey = new Map<string, any>();
-    for (const repo of githubRepos) {
+    for (const repo of [...githubRepos, ...skautisRepos]) {
       reposByKey.set(`${repo.owner.toLowerCase()}::${repo.repo.toLowerCase()}`, repo);
     }
     for (const repo of collaboratorRepos) {

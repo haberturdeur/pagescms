@@ -1,6 +1,7 @@
 export type WriteOperation = "create" | "update" | "delete";
 export type PermissionRule = { paths: string[]; operations: WriteOperation[] };
-export type RepoPermissions = { admin: boolean; restricted: boolean; rules: PermissionRule[] };
+export type FolderGrant = { directory: string; allowed: boolean };
+export type RepoPermissions = { admin: boolean; restricted: boolean; rules: PermissionRule[]; folders?: FolderGrant[]; folderAdmins?: FolderGrant[] };
 export type AccessPolicy = { version: 1; groups: Record<string, string[]>; rules: (PermissionRule & { groups: string[] })[] };
 export const accessPolicyPath = ".pages-access.yml";
 
@@ -14,6 +15,21 @@ export function canonicalRepoPath(path: string): string {
 
 export function protectedRepoPath(path: string) {
   return path === accessPolicyPath || path === ".pages.yml" || path === ".github" || path.startsWith(".github/");
+}
+
+export function isFolderPolicyPath(path: string) {
+  return path.split("/").some(segment => segment === ".access" || segment === ".admins");
+}
+
+export function nearestFolderGrant(grants: FolderGrant[], directory: string) {
+  return grants.filter(grant => !grant.directory || directory === grant.directory || directory.startsWith(grant.directory + "/"))
+    .sort((a, b) => b.directory.length - a.directory.length)[0]?.allowed ?? false;
+}
+
+export function canManageFolderAccess(permissions: RepoPermissions | undefined, directory: string) {
+  if (directory) { try { canonicalRepoPath(directory); } catch { return false; } }
+  if (directory && (protectedRepoPath(directory) || isFolderPolicyPath(directory))) return false;
+  return Boolean(permissions?.folderAdmins && nearestFolderGrant(permissions.folderAdmins, directory));
 }
 
 export function matchesPath(pattern: string, path: string): boolean {
@@ -39,8 +55,13 @@ export function matchesPath(pattern: string, path: string): boolean {
 export function canWrite(permissions: RepoPermissions | undefined, path: string, operation: WriteOperation): boolean {
   try { canonicalRepoPath(path); } catch { return false; }
   if (!permissions) return false;
+  // These files have a dedicated management endpoint. Even GitHub writers may
+  // never modify .admins through a generic CMS content/media operation.
+  if (isFolderPolicyPath(path)) return false;
   if (permissions.admin) return true;
   if (protectedRepoPath(path)) return false;
+  const directory = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
+  if (permissions.folders && !nearestFolderGrant(permissions.folders, directory)) return false;
   return !permissions.restricted || permissions.rules.some(rule => rule.operations.includes(operation)
     && rule.paths.some(pattern => matchesPath(pattern, path)));
 }
@@ -50,8 +71,12 @@ export function canWrite(permissions: RepoPermissions | undefined, path: string,
 export function canCreateWithin(permissions: RepoPermissions | undefined, directory: string): boolean {
   if (directory) { try { canonicalRepoPath(directory); } catch { return false; } }
   if (!permissions) return false;
+  if (isFolderPolicyPath(directory)) return false;
   if (permissions.admin) return true;
   if (protectedRepoPath(directory)) return false;
+  if (permissions.folders && ![directory, ...permissions.folders.map(grant => grant.directory)
+    .filter(path => !directory || path.startsWith(directory + "/"))]
+    .some(path => nearestFolderGrant(permissions.folders!, path))) return false;
   if (!permissions.restricted) return true;
   return permissions.rules.some(rule => rule.operations.includes("create") && rule.paths.some(pattern => {
     const fixed = pattern.split("/").filter((_, index, parts) => parts.slice(0, index + 1).every(p => !/[?*]/.test(p))).join("/");

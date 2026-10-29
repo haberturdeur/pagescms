@@ -15,7 +15,13 @@ const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'pagescms-skautis-test-'
 const originalFetch = globalThis.fetch;
 after(() => { globalThis.fetch = originalFetch; fs.rmSync(temporary, { recursive: true, force: true }); });
 const stubs = {
+  'lib/skautis/repositories.ts': 'export async function repositoriesForSkautisActor() { if(globalThis.fixture.accessError) throw Error("Unavailable"); return globalThis.fixture.admitted ? [{owner:"owner",repo:"repo"}] : []; }',
   'lib/skautis/store.ts': `
+    export async function provisionSkautisUser(accountId,name) {
+      const ctx=await globalThis.fixture.auth.$context;
+      const user=await ctx.internalAdapter.createUser({email:'skautis-'+accountId.replace(':','-')+'@identity.invalid',emailVerified:false,name});
+      await linkSkautisAccount(accountId,user.id);return user.id;
+    }
     export async function saveSkautisFlow(state, flow) { globalThis.fixture.flows.set(state, flow); }
     export async function consumeSkautisFlow(state) { const flow=globalThis.fixture.flows.get(state); globalThis.fixture.flows.delete(state); return flow ?? null; }
     export async function linkSkautisAccount(accountId, userId) {
@@ -53,6 +59,7 @@ const token = '12345678-1234-1234-1234-123456789abc';
 const soap = (id = '42', date = new Date(Date.now() + 600000).toISOString()) => `<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><LoginDetailResponse xmlns="https://is.skaut.cz/"><LoginDetailResult><ID_User>${id}</ID_User><DateLogout>${date}</DateLogout></LoginDetailResult></LoginDetailResponse></soap:Body></soap:Envelope>`;
 let f;
 beforeEach(() => {
+  delete process.env.SKAUTIS_ONLY; delete process.env.SKAUTIS_REPOSITORIES;
   process.env.BASE_URL = base;
   process.env.SKAUTIS_APP_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
   process.env.SKAUTIS_ENVIRONMENT = 'test';
@@ -187,4 +194,26 @@ test('SOAP response limit and token validation apply before accepting identity',
   await assert.rejects(verifySkautisLogin(token));
   process.env.SKAUTIS_ENVIRONMENT='typo';
   await assert.rejects(start());
+});
+
+test('direct skautIS entry requires .access or .admins membership before creating user or session',async()=>{
+  process.env.SKAUTIS_ONLY='true';process.env.SKAUTIS_REPOSITORIES='owner/repo';
+  const denied=await complete(await start());
+  assert.match(denied.headers.get('location'),/skautis_not_allowed/);
+  assert.equal(f.data.user.length,0);assert.equal(f.data.session.length,0);
+  f.admitted=true;
+  const allowed=await complete(await start());
+  const result=await (await request('/get-session',null,cookieHeader(allowed))).json();
+  assert.equal(result.user.emailVerified,false);
+  assert.equal(f.data.user.length,1);assert.equal(f.data.account[0].accountId,'test:42');
+});
+test('membership is rechecked on later logins and upstream policy failures fail closed',async()=>{
+  const local=await localSession();await complete(await start({link:true},local.cookie),local.cookie);
+  process.env.SKAUTIS_ONLY='true';process.env.SKAUTIS_REPOSITORIES='owner/repo';
+  const count=f.data.session.length;
+  assert.match((await complete(await start())).headers.get('location'),/skautis_not_allowed/);
+  assert.equal(f.data.session.length,count);
+  f.accessError=true;
+  assert.match((await complete(await start())).headers.get('location'),/skautis_access_unavailable/);
+  assert.equal(f.data.session.length,count);
 });

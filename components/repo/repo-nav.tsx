@@ -89,7 +89,8 @@ const RepoNav = ({
       ...contentItems,
       ...mediaItems,
       settingsItem,
-      collaboratorsItem
+      collaboratorsItem,
+      { key: "folder-access", icon: <Users className="h-5 w-5 mr-2" />, href: `/${config.owner}/${config.repo}/${encodeURIComponent(config.branch)}/access`, label: "Folder access" }
     ].filter(Boolean);
   }, [config, user]);
 

@@ -323,6 +323,7 @@ export function RepoSidebar() {
     const canManageRepo = hasGithubIdentity(user);
 
     const items: NavItem[] = [];
+    items.push({ key: "folder-access", label: "Folder access", href: `/${config.owner}/${config.repo}/${encodeURIComponent(config.branch)}/access`, icon: <Users className="size-4" /> });
 
     const configObject = (config.object as any) ?? {};
 

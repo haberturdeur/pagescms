@@ -4,6 +4,8 @@ import { createOctokitInstance } from "@/lib/utils/octokit";
 import { createHttpError } from "@/lib/api-error";
 import { accessPolicyPath, canWrite, canonicalRepoPath, permissionsForEmail, type RepoPermissions, type WriteOperation } from "@/lib/repo-permissions";
 import type { User } from "@/types/user";
+import { effectiveFolderGrants, readFolderPolicies } from "@/lib/folder-policy";
+import { getSkautisAccount } from "@/lib/skautis/account";
 
 const patternSchema = z.string().min(1).max(512).refine(pattern => {
   try { canonicalRepoPath(pattern); } catch { return false; }
@@ -31,7 +33,7 @@ export function parseAccessPolicy(source: string) {
 }
 
 export async function getRepoAccess(
-  user: Pick<User, "email" | "emailVerified">,
+  user: Pick<User, "id" | "email" | "emailVerified">,
   owner: string,
   repo: string,
   token: string,
@@ -64,6 +66,21 @@ export async function getRepoAccess(
       throw createHttpError("Repository permissions could not be verified. Ask an administrator to check .pages-access.yml or try again later.", 403);
     }
     permissions = permissionsForEmail(policy, user.email, user.emailVerified);
+  }
+  try {
+    const folders = await readFolderPolicies(token, owner, repo);
+    const account = await getSkautisAccount(user.id);
+    const actor = { ...user, skautisAccountId: account?.accountId };
+    permissions.folderAdmins = effectiveFolderGrants(folders.admins, actor);
+    if (folders.access.length || folders.admins.length) {
+      permissions.folders = effectiveFolderGrants(folders.access, actor);
+      if (!permissions.restricted && !permissions.admin) {
+        permissions.rules = [{ paths: ["**"], operations: ["create", "update", "delete"] }];
+        permissions.restricted = true;
+      }
+    }
+  } catch {
+    throw createHttpError("Folder permissions could not be verified. Check .access and .admins on the default branch.", 403);
   }
   return {
     permissions,

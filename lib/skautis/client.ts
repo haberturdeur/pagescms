@@ -18,7 +18,8 @@ export function parseLoginDetail(xml: string) {
     || !Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
     throw new Error("Invalid or expired skautIS session.");
   }
-  return { userId, expiresAt };
+  const name = typeof detail?.CivilName === "string" ? detail.CivilName : typeof detail?.Person === "string" ? detail.Person : `skautIS ${userId}`;
+  return { userId, expiresAt, name: name.slice(0, 200) };
 }
 
 export async function verifySkautisLogin(token: string) {

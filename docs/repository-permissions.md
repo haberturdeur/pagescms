@@ -1,5 +1,9 @@
 # Repository permissions
 
+For individual editor lists and delegated folder administrators, see
+[`.access` and `.admins` folder permissions](folder-permissions.md). The policy
+below remains supported; when both are present, content edits must pass both.
+
 Add `.pages-access.yml` to the root of the site's **default branch** to restrict
 collaborator edits. Permissions apply to every branch. Without this file,
 collaborators keep the existing editing behavior.

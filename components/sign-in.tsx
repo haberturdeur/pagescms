@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { Loader } from "lucide-react";
 import { SkautisSignIn } from "@/components/skautis-sign-in";
 
-export function SignIn({ skautisEnabled = false }: { skautisEnabled?: boolean }) {
+export function SignIn({ skautisEnabled = false, skautisOnly = false }: { skautisEnabled?: boolean; skautisOnly?: boolean }) {
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [step, setStep] = useState<"email" | "otp">("email");
@@ -31,6 +31,8 @@ export function SignIn({ skautisEnabled = false }: { skautisEnabled?: boolean })
       : `/sign-in?redirect=${encodeURIComponent(safeRedirect)}`;
 
   const getErrorMessage = (value: string) => {
+    if (value === "skautis_not_allowed") return "Your skautIS account is not on this CMS's editor or folder administrator lists. Ask a folder administrator to add you.";
+    if (value === "skautis_access_unavailable") return "Access could not be checked. Please try again later.";
     if (value === "skautis_not_connected") return "First sign in with email or GitHub, then connect your skautIS account in Settings.";
     if (value.startsWith("skautis_")) return "skautIS sign-in could not be completed. Please try again, or sign in with email or GitHub.";
     if (value.toLowerCase() !== "unable_to_get_user_info") return value;
@@ -154,6 +156,16 @@ export function SignIn({ skautisEnabled = false }: { skautisEnabled?: boolean })
       </a>
       .
     </p>
+  );
+
+  if (skautisOnly) return (
+    <div className="min-h-screen p-4 flex justify-center items-center">
+      <div className="max-w-sm w-full space-y-6">
+        <h1 className="text-lg font-medium text-center">Sign in to Pages CMS</h1>
+        <p className="text-sm text-muted-foreground">Sign in with your skautIS account. Your folder administrator must add you to the CMS first.</p>
+        {skautisEnabled ? <SkautisSignIn redirect={safeRedirect} /> : <p role="alert">skautIS sign-in is not configured.</p>}
+      </div>
+    </div>
   );
 
   return (

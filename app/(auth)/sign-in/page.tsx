@@ -1,24 +1,20 @@
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
 import { SignIn } from "@/components/sign-in";
 import { getSafeRedirect } from "@/lib/auth-redirect";
-import { getSkautisConfig } from "@/lib/skautis/config";
+import { getSkautisConfig, skautisOnly } from "@/lib/skautis/config";
+import { getServerSession } from "@/lib/session-server";
 
 export default async function Page({
   searchParams,
 }: {
   searchParams: Promise<{ redirect?: string }>;
 }) {  
-  const requestHeaders = await headers();
   const resolvedSearchParams = await searchParams;
-  const session = await auth.api.getSession({
-    headers: requestHeaders,
-  });
+  const session = await getServerSession();
   const safeRedirect = getSafeRedirect(resolvedSearchParams.redirect);
   if (session?.user) return redirect(safeRedirect === "/sign-in" ? "/" : safeRedirect);
 
 	return (
-    <SignIn skautisEnabled={Boolean(getSkautisConfig())}/>
+    <SignIn skautisEnabled={Boolean(getSkautisConfig())} skautisOnly={skautisOnly()}/>
   );
 }

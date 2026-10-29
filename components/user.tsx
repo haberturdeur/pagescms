@@ -47,7 +47,7 @@ export function User({
               src={
                 user?.githubUsername
                   ? `https://github.com/${user.githubUsername}.png`
-                  : `https://unavatar.io/${user?.email}?fallback=false`
+                  : user.email.endsWith("@identity.invalid") ? undefined : `https://unavatar.io/${user?.email}?fallback=false`
               }
               alt={user?.name || user.email}
             />
@@ -63,7 +63,7 @@ export function User({
             {user.name || user.githubUsername || user.email}
           </div>
           <div className="text-xs font-normal text-muted-foreground truncate">
-            {user.email}
+            {user.email.endsWith("@identity.invalid") ? "skautIS account" : user.email}
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />

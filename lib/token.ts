@@ -3,20 +3,16 @@
  */
 
 import { cache } from "react";
-import { App } from "@octokit/app";
-import { decrypt, encrypt } from "@/lib/crypto";
 import { createOctokitInstance } from "@/lib/utils/octokit";
 import { db } from "@/db";
-import {
-  githubInstallationTokenTable
-} from "@/db/schema";
-import { eq } from "drizzle-orm";
 import { User } from "@/types/user";
 import { getGithubAccount } from "@/lib/github-account";
 import { createHttpError } from "@/lib/api-error";
 import { collaboratorMatchesUserForRepo } from "@/lib/collaborator-access";
 
-const installationTokenRefreshInFlight = new Map<number, Promise<string>>();
+import { getInstallationToken } from "@/lib/installation-token";
+import { getSkautisRepositoryAccess } from "@/lib/skautis/repositories";
+import { skautisOnly } from "@/lib/skautis/config";
 
 // Get a token for a user (including collagborators who need to provide an owner/repo scope).
 const getToken = cache(async (
@@ -25,6 +21,9 @@ const getToken = cache(async (
   repo: string,
   verifyGithubAccess: boolean = false,
 ) => {
+  const skautis = await getSkautisRepositoryAccess(user, owner, repo);
+  if (skautis) return { token: skautis.token, source: "installation" as const };
+  if (skautisOnly()) throw createHttpError("You are not listed in this repository's .access or .admins files.", 403);
   const githubAccount = await getGithubAccount(user.id);
   if (githubAccount?.accessToken) {
     const hasGithubAccess = await canAccessRepoWithToken(githubAccount.accessToken, owner, repo);
@@ -57,81 +56,6 @@ const getToken = cache(async (
     `You do not have permission to access "${owner}/${repo}".`,
     403,
   );
-});
-
-// Get the GitHub App installation token for a specific repository.
-const getInstallationToken = cache(async (owner: string, repo: string) => {
-  const app = new App({
-    appId: process.env.GITHUB_APP_ID!,
-    privateKey: process.env.GITHUB_APP_PRIVATE_KEY!,
-  });
-
-  const repoInstallation = await app.octokit.request(
-    "GET /repos/{owner}/{repo}/installation",
-    { owner, repo },
-  );
-  if (!repoInstallation) throw new Error(`Installation token not found for "${owner}/${repo}".`);
-
-  const installationId = repoInstallation.data.id;
-  const tokenData = await db.query.githubInstallationTokenTable.findFirst({
-    where: eq(githubInstallationTokenTable.installationId, installationId)
-  });
-
-  if (tokenData && Date.now() < tokenData.expiresAt.getTime() - 60_000) {
-    const token = await decrypt(tokenData.ciphertext, tokenData.iv);
-    if (!token) throw new Error(`Token could not be retrieved and/or decrypted.`);
-    return token;
-  }
-
-  const existingRefresh = installationTokenRefreshInFlight.get(installationId);
-  if (existingRefresh) {
-    return existingRefresh;
-  }
-
-  const refreshJob = (async () => {
-    const installationToken = await app.octokit.request(
-      "POST /app/installations/{installation_id}/access_tokens",
-      {
-        installation_id: installationId,
-      },
-    );
-
-    const { ciphertext, iv } = await encrypt(installationToken.data.token);
-    const expiresAt = new Date(installationToken.data.expires_at);
-
-    if (tokenData) {
-      await db.update(githubInstallationTokenTable).set({
-        ciphertext,
-        iv,
-        expiresAt
-      }).where(
-        eq(githubInstallationTokenTable.id, tokenData.id)
-      );
-    } else {
-      await db.insert(githubInstallationTokenTable).values({
-        ciphertext,
-        iv,
-        installationId,
-        expiresAt
-      }).onConflictDoUpdate({
-        target: githubInstallationTokenTable.installationId,
-        set: {
-          ciphertext,
-          iv,
-          expiresAt,
-        },
-      });
-    }
-
-    return installationToken.data.token;
-  })();
-
-  installationTokenRefreshInFlight.set(installationId, refreshJob);
-  try {
-    return await refreshJob;
-  } finally {
-    installationTokenRefreshInFlight.delete(installationId);
-  }
 });
 
 // Get the GitHub user token.

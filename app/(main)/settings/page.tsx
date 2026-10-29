@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/card";
 import { ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getSkautisConfig } from "@/lib/skautis/config";
+import { getSkautisConfig, skautisOnly } from "@/lib/skautis/config";
 import { SkautisSignIn } from "@/components/skautis-sign-in";
 
 export default async function Page({ searchParams }: { searchParams: Promise<{ skautis?: string; error?: string }> }) {
@@ -70,7 +70,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ s
             githubUsername={user.githubUsername}
           />
 
-          <Card>
+          {!skautisOnly() && <Card>
             <CardHeader>
               <CardTitle>Authentication</CardTitle>
               <CardDescription>
@@ -85,7 +85,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ s
                 githubManageUrl={githubManageUrl}
               />
             </CardContent>
-          </Card>
+          </Card>}
 
           {skautisEnabled && <Card>
             <CardHeader>
@@ -95,7 +95,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ s
             <CardContent className="space-y-3">
               {notice.skautis === "connected" && <p role="status" className="text-sm">skautIS connected successfully.</p>}
               {notice.error?.startsWith("skautis_") && <p role="alert" className="text-sm text-destructive">Could not connect skautIS. Your session may have expired, or the identity may already be connected. Please try again.</p>}
-              {skautisAccount ? <p className="text-sm">Your skautIS account is connected.</p> : <SkautisSignIn link />}
+              {skautisAccount ? <div className="space-y-2"><p className="text-sm">Signed in with skautIS.</p><p className="text-sm">Your editor identity: <code>skautis:{skautisAccount.accountId}</code></p></div> : <SkautisSignIn link />}
             </CardContent>
           </Card>}
 

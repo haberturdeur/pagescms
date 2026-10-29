@@ -103,7 +103,7 @@ export function Profile({ name, email, githubUsername }: ProfileProps) {
                     src={
                       githubUsername
                         ? `https://github.com/${githubUsername}.png`
-                        : `https://unavatar.io/${email}?fallback=false`
+                        : email.endsWith("@identity.invalid") ? undefined : `https://unavatar.io/${email}?fallback=false`
                     }
                     alt={avatarLabel}
                   />

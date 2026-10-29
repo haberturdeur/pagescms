@@ -7,7 +7,9 @@ import { decrypt } from "@/lib/crypto";
 import { getBaseUrl } from "@/lib/base-url";
 import { getSkautisConfig, skautisFlowSeconds, skautisHandoffCookie, skautisRedirect, skautisStateCookie } from "./config";
 import { verifySkautisLogin } from "./client";
-import { consumeSkautisFlow, linkSkautisAccount, saveSkautisFlow, type SkautisFlow } from "./store";
+import { consumeSkautisFlow, linkSkautisAccount, provisionSkautisUser, saveSkautisFlow, type SkautisFlow } from "./store";
+import { repositoriesForSkautisActor } from "./repositories";
+import { skautisOnly, skautisRepositories } from "./config";
 
 export const skautis = (): BetterAuthPlugin => ({
   id: "skautis",
@@ -21,9 +23,10 @@ export const skautis = (): BetterAuthPlugin => ({
       if (ctx.headers?.get("origin") !== new URL(getBaseUrl()).origin) {
         throw new APIError("FORBIDDEN", { message: "Invalid origin." });
       }
+      if (skautisOnly() && ctx.body.link) throw new APIError("FORBIDDEN", { message: "Use direct skautIS sign-in." });
       const session = await getSessionFromCtx(ctx, { disableCookieCache: true });
       if (ctx.body.link && !session) throw new APIError("UNAUTHORIZED", { message: "Sign in before connecting skautIS." });
-      if (!ctx.body.link && session) throw new APIError("BAD_REQUEST", { message: "Use Settings to connect skautIS." });
+      if (!ctx.body.link && session && !skautisOnly()) throw new APIError("BAD_REQUEST", { message: "Use Settings to connect skautIS." });
       const state = randomBytes(32).toString("hex");
       await saveSkautisFlow(state, {
         redirect: ctx.body.link ? "/settings" : skautisRedirect(ctx.body.redirect),
@@ -73,7 +76,22 @@ export const skautis = (): BetterAuthPlugin => ({
         catch { return fail("skautis_already_connected"); }
         throw ctx.redirect(new URL("/settings?skautis=connected", getBaseUrl()).toString());
       }
-      const account = await ctx.context.internalAdapter.findAccountByProviderId(accountId, "skautis");
+      let account = await ctx.context.internalAdapter.findAccountByProviderId(accountId, "skautis");
+      const existingUser = account ? await ctx.context.internalAdapter.findUserById(account.userId) : null;
+      if (skautisOnly() || skautisRepositories().length) {
+        let admitted = false;
+        try {
+          const repositories = await repositoriesForSkautisActor({ ...existingUser, skautisAccountId: accountId });
+          admitted = repositories.length > 0;
+        } catch { return fail("skautis_access_unavailable"); }
+        if (!admitted) return fail("skautis_not_allowed");
+        if (!account) {
+          try {
+            await provisionSkautisUser(accountId, identity.name);
+            account = await ctx.context.internalAdapter.findAccountByProviderId(accountId, "skautis");
+          } catch { return fail("skautis_failed"); }
+        }
+      }
       if (!account) return fail("skautis_not_connected");
       const user = await ctx.context.internalAdapter.findUserById(account.userId);
       if (!user) return fail("skautis_failed");
